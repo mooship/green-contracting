@@ -260,6 +260,21 @@ hr {
   text-decoration: none;
 }
 
+#home_header_content a:hover {
+  background-color: #287a3c;
+  color: #fff;
+  box-shadow: 6px 6px 12px 0px rgba(0,0,0,0.30);
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+
+#home_header_content a:active {
+  background-color: #18381e;
+  color: #e0ffe0;
+  transform: scale(0.97);
+  box-shadow: 2px 2px 4px 0px rgba(0,0,0,0.18);
+}
+
 /*GENERAL MAINTENANCE PAGE STYLES*/
 
 #maintenance_header_text {
