@@ -1,0 +1,92 @@
+name: Suspend Hosting
+
+on:
+  schedule:
+    - cron: '0 10 1 1 *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  suspend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Verify target date (2026-01-01 UTC)
+        run: |
+          # This workflow is scheduled yearly at 10:00 UTC; only perform the suspend
+          # action on 2026-01-01 to match the requested "next year" behavior.
+          TARGET="2026-01-01"
+          TODAY_UTC=$(date -u '+%Y-%m-%d')
+          echo "UTC today: $TODAY_UTC, target: $TARGET"
+          if [ "$TODAY_UTC" != "$TARGET" ]; then
+            echo "Not the target date; exiting without changes."
+            exit 0
+          fi
+
+      - name: Remove all files except public/index.html and update index
+        run: |
+          set -euo pipefail
+          KEEP="public/index.html"
+
+          # Remove tracked files except KEEP
+          git ls-files -z | while IFS= read -r -d '' file; do
+            if [ "$file" = "$KEEP" ]; then
+              continue
+            fi
+            git rm -r --ignore-unmatch --quiet "$file" || true
+          done
+
+          # Remove untracked files and directories except KEEP
+          # git clean -e expects patterns relative to the repository root
+          git clean -fdx -e "$KEEP"
+
+          # Ensure public/index.html exists and has the required content
+          mkdir -p public
+          cat > public/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width,initial-scale=1" />
+              <meta name="robots" content="noindex, nofollow" />
+              <title>Hosting suspended</title>
+              <style>
+                html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+                .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;background:#f8f9fb;color:#111}
+                .card{max-width:720px;text-align:center}
+                h1{margin:0 0 8px;font-size:1.6rem}
+                p{margin:8px 0;color:#333}
+                a{color:#0b66ff;text-decoration:none}
+              </style>
+            </head>
+            <body>
+              <main class="wrap" role="main">
+                <section class="card" aria-labelledby="suspended-heading">
+                  <h1 id="suspended-heading">Hosting suspended</h1>
+                  <p>This site is no longer hosted after <strong>12:00 SAST (10:00 UTC) on 1 January 2026</strong>.</p>
+                </section>
+              </main>
+            </body>
+          </html>
+          HTML
+
+          git add public/index.html
+          # Commit the removals and the updated index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Suspend hosting: keep only public/index.html"
+            git push
+          fi
